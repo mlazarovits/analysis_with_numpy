@@ -1,0 +1,11 @@
+These scripts convert ROOT trees into numpy arrays and creates histograms using these arrays
+
+histograms and arrays are saved in a dictionary structure based on the sample and file name, functions return these dictionaries.
+
+The dictionaries can be used interactively or in their own script
+
+
+Use of these scripts require root, root_numpy, and numpy
+
+To install root_numpy using CVMFS (at unl/lpc/lxplus) follow the directions here:
+scikit-hep.org/root_numpy/start.html
