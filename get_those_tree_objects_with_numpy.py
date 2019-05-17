@@ -16,15 +16,20 @@ from collections import OrderedDict
 rt.gROOT.SetBatch()
 rt.TH1.AddDirectory(rt.kFALSE)
 
-def get_tree_info_singular(file_name_, tree_name_, variable_list_, cuts_to_apply_=None):
+def get_tree_info_singular(sample_, file_name_, tree_names_, variable_list_, cuts_to_apply_=None):
     """
     Same as get_tree_info_plural, but runs over a single file
     returns structured array containing the list of variables
     """
-
-    tmp_f = rt.TFile(file_name_, 'r')
-    tmp_t = tmp_f.Get(tree_name_)
-    tmp_array = rnp.tree2array(tmp_t, branches=variable_list_, selection=cuts_to_apply_)
+    tmp_array = {}
+    tmp_array[sample_] = OrderedDict()
+    for tree in tree_names_:
+        tmp_f = rt.TFile(file_name_, 'r')
+        tmp_t = tmp_f.Get(tree)
+        if bool(tmp_t) and tmp_t.InheritsFrom(rt.TTree.Class()): 
+            tmp_array[sample_][tree] = rnp.tree2array(tmp_t, branches=variable_list_, selection=cuts_to_apply_)
+        else:
+            print 'tree: ' + tree + ' is not a tree, skipping'
     
     return tmp_array
 
@@ -96,9 +101,42 @@ def reduce_singular(in_file_name_, out_file_name_, variable_list_):
     reduced_tree.Write()
     file_out.Close()
 
+##### old version #####
+# def process_the_samples(input_sample_list_, variable_list_, cut_list_, truncate_file_ = None, tree_in_dir_ = None):
+#     array_list = OrderedDict()
+# 
+#     for sample, folder in input_sample_list_.items():
+#         print sample, folder
+#         file_list = [os.path.join(folder, f) for f in os.listdir(folder) if (os.path.isfile(os.path.join(folder, f)) and ('.root' in f))]
+#         # Get file structure, in case there is a grid of mass points
+#         f_struct_tmp = rt.TFile(file_list[0], 'r')
+#         tree_list = []
+#         if tree_in_dir_ is not None:
+#             tree_list = [directory.GetName()+'/'+tree_in_dir_ for directory in f_struct_tmp.GetListOfKeys()]
+#         else:
+#             tree_list = [tree.GetName() for tree in f_struct_tmp.GetListOfKeys()]
+# 
+#         if truncate_file_ is not None:
+#             file_list = file_list[:truncate_file_]
+#         if 'SMS' in sample:
+#             tree_name_mass = [(int(mass.split('_')[0]), int(mass.split('_')[1])) for mass in tree_list]
+#             tree_name_mass.sort(key=lambda x: int(x[0]))
+#             tree_list = [str(mom) + '_' + str(child) for mom, child in tree_name_mass]
+# 
+#         if variable_list_ is None:
+#             variable_list_ = [branch.GetName() for branch in f_struct_tmp.Get(tree_list[0]).GetListOfBranches()]
+#         f_struct_tmp.Close()
+#         variable_list_ = list(OrderedDict.fromkeys(variable_list_))
+#         array_list[sample] = get_tree_info_plural(file_list, tree_list, variable_list_)     
+# 
+#     file_list = None
+# 
+#     return array_list
+##########################
 
-def process_the_samples(input_sample_list_, variable_list_, cut_list_, truncate_file_ = None, tree_in_dir_ = None):
-    array_list = OrderedDict()
+
+def process_the_samples(input_sample_list_, truncate_file_ = None, tree_in_dir_ = None):
+    list_of_files = OrderedDict()
 
     for sample, folder in input_sample_list_.items():
         print sample, folder
@@ -114,19 +152,18 @@ def process_the_samples(input_sample_list_, variable_list_, cut_list_, truncate_
         if truncate_file_ is not None:
             file_list = file_list[:truncate_file_]
         if 'SMS' in sample:
+            trees_to_keep = ['500_100', '500_325', '775_600']
             tree_name_mass = [(int(mass.split('_')[0]), int(mass.split('_')[1])) for mass in tree_list]
             tree_name_mass.sort(key=lambda x: int(x[0]))
-            tree_list = [str(mom) + '_' + str(child) for mom, child in tree_name_mass]
+            if trees_to_keep is not None:
+                tree_list = trees_to_keep
+            else:
+                tree_list = [str(mom) + '_' + str(child) for mom, child in tree_name_mass]
 
-        if variable_list_ is None:
-            variable_list_ = [branch.GetName() for branch in f_struct_tmp.Get(tree_list[0]).GetListOfBranches()]
         f_struct_tmp.Close()
-        variable_list_ = list(OrderedDict.fromkeys(variable_list_))
-        array_list[sample] = get_tree_info_plural(file_list, tree_list, variable_list_)     
+        list_of_files[sample] = OrderedDict([('files', file_list), ('trees', tree_list)])
+    return list_of_files
 
-    file_list = None
-
-    return array_list
 
 
 def write_hists_to_file(hists_, out_file_name_):

@@ -47,6 +47,7 @@ def make_2D_plots(hists_):
             out_dir = os.path.join('./plots_'+date, sample, tree)
             for hist_name, hist in hists_[sample][tree].items():
                 if not hist.InheritsFrom(rt.TH2.Class()): continue
+                if hist_name not in pc: continue
                 can = make_me_a_canvas()
                 can.cd() 
                 hist.RebinX(4)
@@ -94,6 +95,15 @@ def make_2D_plots(hists_):
                 CMS_lumi.writeExtraText = 1
                 CMS_lumi.extraText = 'Simulation'
                 CMS_lumi.CMS_lumi(can, 0, 0)
+                l = rt.TLatex()
+                l.SetTextFont(42);
+                l.SetNDC();
+                l.SetTextSize(0.055);
+                l.SetTextFont(42);
+                if 'SMS' in sample:
+                    l.DrawLatex(0.6,0.943,sc[sample]['legend']+' '+tree);
+                else:
+                    l.DrawLatex(0.6,0.943,sc[sample]['legend']);
                 can.Update()
                 can.SaveAs(out_dir+'/h_'+hist.GetName()+'.root')
                 can.SaveAs(out_dir+'/h_'+hist.GetName()+'.pdf')
@@ -101,6 +111,76 @@ def make_2D_plots(hists_):
 def make_overlay_plot(hists_, samples_):
     print 'for posterity'
 
+def make_stacked_plots(hists_,print_plots = True):
+    '''
+    Makes stacked plots following the samples that are given in the histogram dictionary
+    '''
+    if print_plots:
+        if not (os.path.isdir('./plots_'+date)): os.mkdir('./plots_'+date)
+    stack = OrderedDict()
+    
+    n_entries = OrderedDict()
+    hists_tmp = OrderedDict()
+    for sample in hists_:
+        for tree in hists_[sample]:
+            for hist_name, hist in hists_[sample][tree].items():
+                if not hist.InheritsFrom(rt.TH1.Class()): continue                    
+                stack[hist_name] = rt.THStack('stack','')
+                n_entries[hist_name] = OrderedDict()
+                hists_tmp[hist_name] = OrderedDict()
+    for sample in hists_:
+        for tree in hists_[sample]:
+            for hist_name, hist in hists_[sample][tree].items():
+                if not hist.InheritsFrom(rt.TH1.Class()): continue                    
+                n_entries[hist_name][sample] = hist.Integral(0,10000)
+                hists_tmp[hist_name][sample] = hist
+    for hist in n_entries:
+        n_entries[hist] = OrderedDict(sorted(n_entries[hist].items(), key=lambda x: x[1], reverse=True))
+        can = make_me_a_canvas()
+        can.cd() 
+        leg = rt.TLegend(0.12,0.66,0.88,0.88,'','brNDC') 
+        leg.SetBorderSize(0)
+        leg.SetFillColor(0)
+        leg.SetTextSize(0.03)
+        leg.SetMargin(0.2)
+        for sample in n_entries[hist]:
+            hists_tmp[hist][sample].SetLineColor(sc[sample]['color'])
+            hists_tmp[hist][sample].SetLineStyle(sc[sample]['style'])
+            if sc[sample]['fill']: hists_tmp[hist][sample].SetFillColor(sc[sample]['fill'])
+            if sc[sample]['fill_style']: hists_tmp[hist][sample].SetFillStyle(sc[sample]['style'])
+            stack[hist].Add(hists_tmp[hist][sample])
+            leg.AddEntry(hists_tmp[hist][sample], sc[sample]['legend'], 'fl')
+        can.cd()
+        
+        stack[hist].GetXaxis().CenterTitle();
+        stack[hist].GetXaxis().SetTitleFont(42);
+        stack[hist].GetXaxis().SetTitleSize(0.06);
+        stack[hist].GetXaxis().SetTitleOffset(1.06);
+        stack[hist].GetXaxis().SetLabelFont(42);
+        stack[hist].GetXaxis().SetLabelSize(0.05);
+        stack[hist].GetXaxis().SetTitle(pc[hist]['xlabel']);
+        stack[hist].GetYaxis().CenterTitle();
+        stack[hist].GetYaxis().SetTitleFont(42);
+        stack[hist].GetYaxis().SetTitleSize(0.06);
+        stack[hist].GetYaxis().SetTitleOffset(1.12);
+        stack[hist].GetYaxis().SetLabelFont(42);
+        stack[hist].GetYaxis().SetLabelSize(0.05);
+        stack[hist].GetYaxis().SetTitle(pc[hist]['ylabel']);
+        stack[hist].Draw('hist')
+        CMS_lumi.writeExtraText = 1
+        CMS_lumi.extraText = 'Simulation'
+        CMS_lumi.CMS_lumi(can, 0, 0)
+        can.Update()
+        if print_plots:
+            can.SaveAs(out_dir+'/hstack_'+hist.GetName()+'.root')
+            can.SaveAs(out_dir+'/hstack_'+hist.GetName()+'.pdf')
+
+    return stack
+
+def make_stack_n_sig_plots(sig_hists_, stack_):
+    print 'for posterity'
+
+    
 def make_1D_plots(hists_):
     print 'some more posterity here'
     if not (os.path.isdir('./plots_'+date)): os.mkdir('./plots_'+date)
@@ -110,9 +190,13 @@ def make_1D_plots(hists_):
             if not (os.path.isdir('./plots_'+date+'/'+sample+'/'+tree)): os.mkdir(os.path.join('./plots_'+date, sample, tree))
             out_dir = os.path.join('./plots_'+date, sample, tree)
             for hist_name, hist in hists_[sample][tree].items():
-                if not hist.InheritsFrom(rt.TH1.Class()): continue                    
+                if not hist.InheritsFrom(rt.TH1.Class()): continue                   
+                if hist.InheritsFrom(rt.TH2.Class()): continue 
+                if hist_name not in pc: continue
                 can = make_me_a_canvas()
-                can.cd() 
+                can.cd()
+                hist.Draw('hist')
+                hist.Rebin(4) 
                 hist.SetLineColor(sc[sample]['color'])
                 hist.SetLineStyle(sc[sample]['style'])
                 if sc[sample]['fill']: hist.SetFillColor(sc[sample]['fill'])
@@ -137,7 +221,7 @@ def make_1D_plots(hists_):
                 l = rt.TLatex()
                 l.SetTextFont(42);
                 l.SetNDC();
-                l.SetTextSize(0.035);
+                l.SetTextSize(0.055);
                 l.SetTextFont(42);
                 l.DrawLatex(0.41,0.943,sc[sample]['legend']);
                 can.Update()
@@ -172,11 +256,12 @@ def read_in_hists(in_file_):
 
 
 if __name__ == "__main__":
-    signal_file = './output_signal_histos.root'
-    background_file = './output_background_histos.root' 
+    signal_file = './output_signal_hists.root'
+    background_file = './output_background_hists.root' 
 
     back_hists = read_in_hists(background_file)
     make_2D_plots(back_hists)
+    make_1D_plots(back_hists)
     
-    sig_hists = read_in_hists(signal_file)
-    make_2D_plots(sig_hists)
+    #sig_hists = read_in_hists(signal_file)
+    #make_2D_plots(sig_hists)
