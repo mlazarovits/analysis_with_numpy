@@ -138,9 +138,14 @@ def reduce_singular(in_file_name_, out_file_name_, variable_list_):
 def process_the_samples(input_sample_list_, truncate_file_ = None, tree_in_dir_ = None):
     list_of_files = OrderedDict()
 
-    for sample, folder in input_sample_list_.items():
-        print sample, folder
-        file_list = [os.path.join(folder, f) for f in os.listdir(folder) if (os.path.isfile(os.path.join(folder, f)) and ('.root' in f))]
+    for sample, list_of_folders in input_sample_list_.items():
+        print sample
+        file_list = []
+        for folder in list_of_folders:
+            print '->', folder
+            file_list_tmp = [os.path.join(folder, f) for f in os.listdir(folder) if (os.path.isfile(os.path.join(folder, f)) and ('.root' in f))]
+            file_list.append(file_list_tmp)
+        file_list = np.concatenate(file_list)
         # Get file structure, in case there is a grid of mass points
         f_struct_tmp = rt.TFile(file_list[0], 'r')
         tree_list = []
